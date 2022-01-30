@@ -7,13 +7,15 @@
 # The url of your monitor (with Acesskey for autologin).
 # This is the monitor account and not the alarm accesskey
 # Also replace the braces
-MONITOR="{YOUR MONITOR URL}"
+#MONITOR_URL="{YOUR MONITOR URL}"
+
+source config_monitor.sh
 
 # This function starts or stops the divera monitor.
 function monitor(){
 	if [ $1 = on ]; then
 		# starts chromium in in kiosk mode
-		chromium-browser --noerrdialogs --kiosk --incognito $MONITOR &>/dev/null &
+		chromium-browser --noerrdialogs --kiosk --incognito $MONITOR_URL &>/dev/null &
 	elif [ $1 = off ]; then
 		# just kill every chromium process
 		pkill chromium >/dev/null

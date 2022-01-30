@@ -1,71 +1,35 @@
 #!/bin/bash
-
-# set Installationdirectory
-BASEFOLDER=~/divera
-
-# set ACCESSKEY
+ 
 ACCESSKEY="{YOUR ACCESS KEY}"
-
-# set URLS for API v1 and v2
-API_URL_ALARM="https://www.divera247.com/api/last-alarm?accesskey=${ACCESSKEY}"
-APIV2_URL_AUTH="https://www.divera247.com/api/v2/auth/jwt?accesskey=${ACCESSKEY}"
-APIV2_URL_EVENTS="https://www.divera247.com/api/v2/events?accesskey=${ACCESSKEY}"
-
-# set Variables
+API_URL="https://www.divera247.com/api/last-alarm?accesskey=${ACCESSKEY}"
 IS_MONITOR_ACTIVE=true
-HAS_ALARM=false
-
-# routes logging
-exec > $BASEFOLDER/log.txt
-exec 2> $BASEFOLDER/error.txt
-
-# set events file location
-EVENT_JSON=$BASEFOLDER/events.json
 
 # includes the divera commands
-source $BASEFOLDER/divera_commands.sh
-
-# boot log
-echo "Booting up"
-date
-
-# test network
-while ! ping -c 1 -W 1 divera247.com>/dev/null; do
-	echo "Waiting for network to come up and connect to divera"
-	sleep 1
-done
-
-# Download Events
-curl -X GET ${APIV2_URL_AUTH} -H "accept: application/json" | jq -r -j -e '.sucess' > /dev/null && echo "API V2 authorized"
-sleep 10
-curl -X GET ${APIV2_URL_EVENTS} -H "accept: application/json"  | jq '. | .data.items[] | {title:.title, start:.start, end:.end}' > $EVENT_JSON
-echo "Authorized and Events downloaded"
-sleep 1
-
-# set weekly duty times to add to JSON
-REG_DUTY_TIME="18:00"
-REG_DUTY_DAY="Wed"
-
-#add next dutytime to events.json
-date --date="$REG_DUTY_TIME next $REG_DUTY_DAY" +%s | jq '[. , .+21600] | {title:"Dienstabend", start:.[0], end:.[1]}' >> $EVENT_JSON
+source .divera_commands.sh
 
 # at boot show the monitor
 monitor on
-
-sleep 60
-
+ 
 while true; do
     HAS_ALARM=`curl -s ${API_URL} | jq -r -j '.success'`
-    
-    # get Time and DOW only for restart, plan to fix this
     DOW=$(date +%u) #Monday=1 
     HOUR=$(date +%H)
     MINUTES=$(date +%M)
-    
     DUTY_TIME=false
+
+    # here you can define your duty times
+    #Wednesday duty
+    if [ $DOW = 3 ] && [ $HOUR -ge 17 ]; then
+    	DUTY_TIME=true
+    fi
+    if [ $DOW = 4 ] && [ $HOUR -lt 1 ]; then
+    	DUTY_TIME=true
+    fi
+    #saturday duty
+    if [ $DOW = 6 ] && [ $HOUR -ge 7 ] && [ $HOUR -le 19 ]; then
+    	DUTY_TIME=true
+    fi
     
-    #Parse events.json for active event +-1h
-    DUTY_TIME=$(cat $EVENT_JSON | jq '[[.start|.<now+3600],[.end|.>now-3600]] | transpose | .[] | all' |  jq -s -e '. | any')
     
     #case: active mission and monitor off
     if [ $HAS_ALARM = true ] && [ $IS_MONITOR_ACTIVE = false ]; then
